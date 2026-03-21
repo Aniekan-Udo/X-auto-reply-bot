@@ -1,0 +1,14 @@
+[project]
+name = "twitter-auto-reply"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "celery>=5.6.2",
+    "dotenv>=0.9.9",
+    "langchain-core>=1.2.20",
+    "langchain-groq>=1.1.2",
+    "limits>=5.8.0",
+    "tenacity>=9.1.4",
+]
