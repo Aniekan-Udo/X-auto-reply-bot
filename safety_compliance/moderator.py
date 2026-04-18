@@ -12,7 +12,11 @@ from limits import parse
 from limits.storage import MemoryStorage
 from limits.strategies import FixedWindowRateLimiter
 
-from database.db import save_to_db, load_from_db
+from database.db import AccessDB
+
+save_to_db = AccessDB.save_to_db()
+load_from_db = AccessDB.load_from_db()
+
 
 import httpx
 
@@ -25,8 +29,7 @@ logger = logging.getLogger(__name__)
 storage = MemoryStorage()
 rate_limiter = FixedWindowRateLimiter(storage)
 limit = parse("60 per hour")
-from celery import Celery
-app = Celery('tasks', broker='redis://localhost:6379/0')
+
 
 load_dotenv()
 
@@ -35,7 +38,11 @@ groq_api_key=os.getenv("GROQ_API_KEY")
 
 
 from celery import Celery
-app = Celery('tasks', broker='redis://localhost:6379/0')
+app = Celery(
+    "tasks",
+    broker=os.environ["CELERY_BROKER_URL"],  # tells Celery to USE RabbitMQ
+    backend=os.environ["CELERY_RESULT_BACKEND"]  # tells Celery to USE Redis
+)
 
 llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
 
@@ -46,36 +53,41 @@ moderation_prompt = ChatPromptTemplate.from_messages([
 - 0.5 = borderline — could be misinterpreted or slightly risky  
 - 1.0 = dangerous — contains financial advice, toxic content, PII, or legal risk
 
-Reply to score: "{reply}"
 
 Respond with ONLY a float number between 0.0 and 1.0. Nothing else.
-""")]
+"""), ("user", "{reply}")]
 )
 
 
 chain = moderation_prompt | llm
 
 # safety_compliance/safety.py
+@app.task(bind=True, max_retries=3, default_retry_delay=5)
+def moderate(self,tweet_id: str, reply: str) -> str | None:
+    try:
+        score = asyncio.run(get_moderation_score(reply))
 
-async def moderate(tweet_id: str, reply: str) -> str | None:
-    score = await get_moderation_score(reply)
+        if score < 0.3:
+            # auto approve — pass to Layer 5
+            from dispatch_observability.write_tweet import dispatch_reply
+            dispatch_reply.delay(tweet_id, reply, score)  
+            logger.info("approved: %s (score=%.2f)", tweet_id, score)
+            return None
 
-    if score < 0.3:
-        # auto approve — pass to Layer 5
-        logger.info("approved: %s (score=%.2f)", tweet_id, score)
-        return reply
+        elif score < 0.7:
+            # grey zone — send to HITL queue
+            logger.info("HITL triggered: %s (score=%.2f)", tweet_id, score)
+            add_to_hitl_queue.delay(tweet_id, reply, score)
+            return None
 
-    elif score < 0.7:
-        # grey zone — send to HITL queue
-        logger.info("HITL triggered: %s (score=%.2f)", tweet_id, score)
-        await add_to_hitl_queue(tweet_id, reply, score)
-        return None
-
-    else:
-        # auto reject — drop it
-        logger.info("rejected: %s (score=%.2f)", tweet_id, score)
-        return None
-
+        else:
+            # auto reject — drop it
+            logger.info("rejected: %s (score=%.2f)", tweet_id, score)
+            return None
+    except Exception as e:
+        logger.error("Failed to moderate tweet %s: %s", tweet_id, str(e), exc_info=True)
+        raise self.retry(exc=e)  # Retry the task
+    
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -102,37 +114,45 @@ class HITLModerator:
 
     async def workflow(self):
         self.job_id = save_to_db(self.tweet_id, self.reply, self.score)  # Save the reply and score to the database for review
-        await notify_via_telegram(self.job_id, self.reply)  # Notify human moderators to review this reply via email/slack/dashboard/etc.
+        try:
+            await notify_via_telegram(self.job_id, self.reply)  # Notify human moderators to review this reply via email/slack/dashboard/etc.
+            return self.job_id
+        except Exception as e:
+            logger.error(f"Error occurred while notifying via Telegram: {e}", exc_info=True)
+            raise
 
-        return self.job_id
-    
-    # Later, when human responds via your UI/API (Layer 5):
-    async def resume(self,job_id, approved):
+    @staticmethod
+    async def resume(job_id:str, approved:bool):
+        from dispatch_observability.write_tweet import dispatch_reply
         job = load_from_db(job_id)
         if approved:
-            await post_reply(job['tweet_id'], job['draft'])  # Post the approved reply to Twitter
+            # Layer 5 — post the reply to Twitter   
+            dispatch_reply.delay(job['tweet_id'], job['reply'], job['score'])  # Post the approved reply to Twitter
         else:
             logger.info(f"Reply for tweet {job['tweet_id']} was rejected by human moderators.")
 
 
 @app.task(bind=True, max_retries=3)
-async def add_to_hitl_queue(tweet_id: str, reply: str, score: float) -> str:
-    asyncio.run(HITLModerator(tweet_id, reply, score).workflow())
+def add_to_hitl_queue(self, tweet_id: str, reply: str, score: float) -> str:
+    try:
+        job_id = asyncio.run(HITLModerator(tweet_id, reply, score).workflow())
+        return job_id
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=2 ** self.request.retries)
 
 
-async def post_reply(tweet_id: int, reply: str):
-    # Placeholder function to post the reply to Twitter
-    # In a real implementation, this would involve calling the Twitter API to post the reply
-    logger.info(f"Posting reply to tweet {tweet_id}: {reply}")
 
 
-async def notify_via_telegram(job_id: str, draft: str):
+async def notify_via_telegram(job_id: str, reply: str):
+    """Sends a notification to human moderators via Telegram with the reply that needs review.
+    The message includes inline buttons for "Approve" and "Reject" that moderators can click to approve or reject the reply."""
+    
     async with httpx.AsyncClient() as client:# Use context manager to ensure proper cleanup of resources(open and close connections)
         await client.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
             json={
                 "chat_id": "YOUR_CHAT_ID",
-                "text": f"Review this draft:\n\n{draft}",
+                "text": f"Review this reply:\n\n{reply}",
             "reply_markup": {
                 "inline_keyboard": [[
                     {"text": "✅ Approve", "callback_data": f"approve:{job_id}"},
@@ -142,3 +162,16 @@ async def notify_via_telegram(job_id: str, draft: str):
         }
     )
 
+
+
+
+
+# A FastAPI endpoint that receives Telegram callbacks
+# @app.post("/telegram/callback")
+# async def telegram_callback(update: dict):
+#     callback = update["callback_query"]
+#     data = callback["data"]  # "approve:job_id" or "reject:job_id"
+#     action, job_id = data.split(":")
+#     approved = action == "approve"
+#     await HITLModerator.resume(job_id, approved)
+#     return {"ok": True}

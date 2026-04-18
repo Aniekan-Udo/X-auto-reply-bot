@@ -27,6 +27,9 @@ from queue_dedup.dedup import MemoryDedup
 from queue_dedup.queue import  QueueWorker
 from ingestion_layer.poller import SearchPoller
 from processing_AI.AI_integration import process_event
+from database.db import init_db
+
+init_db()
 
 logging.basicConfig(
     level=logging.INFO,

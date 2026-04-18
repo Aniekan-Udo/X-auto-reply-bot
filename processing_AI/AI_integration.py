@@ -13,11 +13,17 @@ import logging
 import os  
 from ingestion_layer.models import TweetEvent
 from dotenv import load_dotenv
+load_dotenv()
+
 
 from celery import Celery
-app = Celery('tasks', broker='redis://localhost:6379/0')
+app = Celery(
+    "tasks",
+    broker=os.environ["CELERY_BROKER_URL"],  # tells Celery to USE RabbitMQ
+    backend=os.environ["CELERY_RESULT_BACKEND"]  # tells Celery to USE Redis
+    )
 
-load_dotenv()
+
 
 groq_api_key=os.getenv("GROQ_API_KEY")
 logger = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 # queue_dedup/queue.py
-
+import os
 import logging
 from celery import Celery
 from ingestion_layer.models import TweetEvent
@@ -7,7 +7,11 @@ from queue_dedup.dedup import BaseDedup
 
 logger = logging.getLogger(__name__)
 
-app = Celery('tasks', broker='redis://localhost:6379/0')
+app = Celery(
+    "tasks",
+    broker=os.environ["CELERY_BROKER_URL"],  # tells Celery to USE RabbitMQ
+    backend=os.environ["CELERY_RESULT_BACKEND"]  # tells Celery to USE Redis
+)
 
 
 class QueueWorker:

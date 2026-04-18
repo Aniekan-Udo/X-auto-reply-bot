@@ -7,8 +7,18 @@ requires-python = ">=3.11"
 dependencies = [
     "celery>=5.6.2",
     "dotenv>=0.9.9",
+    "fastapi>=0.135.1",
+    "httpx>=0.28.1",
     "langchain-core>=1.2.20",
     "langchain-groq>=1.1.2",
     "limits>=5.8.0",
+    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
+    "pyairtable>=3.3.0",
+    "python-dotenv>=1.2.2",
+    "redis>=7.3.0",
+    "sqlalchemy>=2.0.48",
     "tenacity>=9.1.4",
+    "tweepy>=4.16.0",
+    "uvicorn>=0.42.0",
 ]
