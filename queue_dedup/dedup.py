@@ -1,12 +1,3 @@
- # Answers one question: "have we already seen this tweet ID?"
-#
-# Two backends with an identical interface:
-#   MemoryDedup — what you're using now (resets on restart)
-#   RedisDedup  — swap in when you install Redis, zero other changes
-#
-# The queue calls dedup.check_and_mark(tweet_id) before accepting
-# any event. Returns True = duplicate, drop it. False = new, keep it.
-
 
 import logging
 import time
@@ -20,6 +11,7 @@ logger = logging.getLogger(__name__)
 SEEN_TTL_SECONDS = 48 * 60 * 60
 
 class BaseDedup(ABC):
+    """Abstract base class for deduplication. Defines the interface and common logic."""
 
     @abstractmethod
     def mark_seen(self, tweet_id:str) -> None:
