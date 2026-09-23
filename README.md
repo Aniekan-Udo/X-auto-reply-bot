@@ -1,4 +1,4 @@
-# X (Twitter) AI Auto-Reply Bot 🤖🐦
+# X (Twitter) AI Auto-Reply Bot
 
 A bot that keeps an eye on popular trading accounts on **X (Twitter)**, writes clever, on-brand replies to their posts using AI, **checks that each reply is safe**, and only then posts it. Anything it's unsure about is sent to your phone so you can approve or reject it with one tap.
 
@@ -10,13 +10,13 @@ Brands grow on X by joining the conversation, replying quickly and cleverly to t
 
 This bot does the work for you, **carefully**:
 
-1. 👀 **It watches X** for new posts from the accounts you choose.
-2. ✍️ **It writes a reply** in your brand's voice: witty, knowledgeable, a little sarcastic, never rude.
-3. 🛡️ **It checks the reply for risk** before anything is posted.
-4. ✅ **Safe replies are posted automatically.**
-5. 📱 **Borderline replies are sent to you on Telegram** with **Approve** and **Reject** buttons.
-6. 🗑️ **Risky replies are thrown away**, and nothing is posted.
-7. 📒 **Everything is recorded** in an Airtable spreadsheet, so you can see what the bot did and why.
+1. **It watches X** for new posts from the accounts you choose.
+2. **It writes a reply** in your brand's voice: witty, knowledgeable, a little sarcastic, never rude.
+3. **It checks the reply for risk** before anything is posted.
+4. **Safe replies are posted automatically.**
+5. **Borderline replies are sent to you on Telegram** with **Approve** and **Reject** buttons.
+6. **Risky replies are thrown away**, and nothing is posted.
+7. **Everything is recorded** in an Airtable spreadsheet, so you can see what the bot did and why.
 
 There's also a **practice mode** ("dry run"), which is switched on by default. The bot does everything *except* actually post, so you can see what it *would* have said before letting it go live.
 
@@ -27,16 +27,16 @@ There's also a **practice mode** ("dry run"), which is switched on by default. T
 Think of it as a small team where each member has one job:
 
 ```
-   📥 The Watcher         Checks X every 15 minutes for new posts
+   The Watcher          Checks X every 15 minutes for new posts
           │
           ▼
-   🧹 The Filter          Ignores posts it has already seen, and drops
-          │               obvious spam ("100x gem!", "DM for signals", giveaways…)
+   The Filter           Ignores posts it has already seen, and drops
+          │             obvious spam ("100x gem!", "DM for signals", giveaways…)
           ▼
-   ✍️ The Writer          AI reads the post and drafts a reply in your brand voice.
-          │               It can also decide a post isn't worth replying to.
+   The Writer           AI reads the post and drafts a reply in your brand voice.
+          │             It can also decide a post isn't worth replying to.
           ▼
-   🛡️ The Safety Checker  A second AI gives the reply a risk score from 0 to 1
+   The Safety Checker   A second AI gives the reply a risk score from 0 to 1
           │
     ┌─────┼──────────────────────┐
     ▼     ▼                      ▼
@@ -44,19 +44,19 @@ Think of it as a small team where each member has one job:
  (<0.3) (0.3 – 0.7)            (>0.7)
     │     │                      │
     │     ▼                      ▼
-    │   📱 Sent to you on      🗑️ Discarded
+    │   Sent to you on         Discarded
     │   Telegram: Approve / Reject
     │     │ (if approved)
     ▼     ▼
-   📤 The Publisher       Posts the reply on X and records it in Airtable
+   The Publisher        Posts the reply on X and records it in Airtable
 ```
 
 ### What the brand voice sounds like
 
 | Someone posts… | The bot might reply… |
 |---|---|
-| "This coin just pumped 50% on no news wtf" | "Classic meme coin chaos. Whale sneezed or an influencer hit post — same energy. What pumps for no reason tends to dump for even less. DYOR before chasing 🎢" |
-| "The market is crashing everything is over" | "Every cycle has a graveyard of 'this is the end' tweets. Zoom out — BTC has died 400+ times according to headlines. 📉📈" |
+| "This coin just pumped 50% on no news wtf" | "Classic meme coin chaos. Whale sneezed or an influencer hit post — same energy. What pumps for no reason tends to dump for even less. DYOR before chasing." |
+| "The market is crashing everything is over" | "Every cycle has a graveyard of 'this is the end' tweets. Zoom out — BTC has died 400+ times according to headlines." |
 | "100x gem alert DM me for signals" | *(skipped: spam)* |
 
 ### Built-in safety rules
@@ -81,7 +81,7 @@ Someone comfortable with a computer terminal will need to do the setup. Here's w
 | **Airtable account** | Keeps the activity log and stats | <https://airtable.com>. Create a base with two tables: **Audit Log** and **Metrics** |
 | **Docker** | Runs the supporting services with one command | <https://www.docker.com/products/docker-desktop/> |
 
-> 💡 An **API key / token** is like a password that lets the bot use a service on your behalf. Keep them private and never upload them to GitHub.
+> **Tip:** An **API key / token** is like a password that lets the bot use a service on your behalf. Keep them private and never upload them to GitHub.
 
 ---
 
@@ -196,7 +196,7 @@ uv run python simulate.py
 
 When a reply scores between 0.3 and 0.7 on the risk scale:
 
-1. You get a **Telegram message** with the proposed reply and two buttons: **✅ Approve** and **❌ Reject**.
+1. You get a **Telegram message** with the proposed reply and two buttons: **Approve** and **Reject**.
 2. **Approve** → it's posted on X straight away. **Reject** → it's dropped and logged.
 
 For the buttons to work, Telegram must be able to reach the dashboard (step 4, window 3). Set the Telegram bot's webhook to `https://<your-public-address>/telegram/callback`. Tools like [ngrok](https://ngrok.com) can give your computer a temporary public address.
@@ -258,14 +258,14 @@ Tests (`test_dedup.py`, `test_models.py`, `test_poller.py`, `test_queue.py`, `te
 
 | Variable | Required | Description |
 |---|---|---|
-| `TWITTER_BEARER_TOKEN` | ✅ | X API v2 bearer token (reading) |
-| `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET` | ✅ to post | X credentials for posting |
-| `GROQ_API_KEY` | ✅ | Groq API key |
-| `TELEGRAM_TOKEN` | ✅ | Telegram bot token |
-| `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID` | ✅ | Airtable access |
-| `DB_PASSWORD` | ✅ | Postgres password |
-| `CELERY_BROKER_URL` | ✅ | RabbitMQ URL |
-| `CELERY_RESULT_BACKEND` | ✅ | Redis URL |
+| `TWITTER_BEARER_TOKEN` | Yes | X API v2 bearer token (reading) |
+| `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET` | Yes, to post | X credentials for posting |
+| `GROQ_API_KEY` | Yes | Groq API key |
+| `TELEGRAM_TOKEN` | Yes | Telegram bot token |
+| `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID` | Yes | Airtable access |
+| `DB_PASSWORD` | Yes | Postgres password |
+| `CELERY_BROKER_URL` | Yes | RabbitMQ URL |
+| `CELERY_RESULT_BACKEND` | Yes | Redis URL |
 | `SEARCH_QUERY` | — | X search query (accounts to watch) |
 | `POLL_INTERVAL_SECONDS` | — | Default `900` (15 min; free-tier minimum) |
 | `DRY_RUN` | — | Default `true`; set to `false` to post for real |
